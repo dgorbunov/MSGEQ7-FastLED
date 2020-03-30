@@ -1,33 +1,38 @@
-#include <FastLED.h>
+//This code is designed to be used with good old LEDs, connected in parallel to the PWM channels and common ground
+//Author: Daniel Gorbunov
 
-#define NUM_LEDS 150
-
-#define DATA_PIN 7
-
-CRGB leds[NUM_LEDS];
-
-int StrobePin = 22;
-int ResetPin = 24;
+const int StrobePin = 22;
+const int ResetPin = 24;
 const int DataIn = A15;
 
+const int led1 = 2;
+const int led2 = 3;
+const int led3 = 4;
+
 int spectrum[7];
+int smoothed[7];
+
+// ADJUSTMENT //
+const int noisethresh = 15; //process data to cut off anything below this, i.e. noise
+const int smoothing = 6; //how many times we smooth out the spectrum data. More smoothing = less transients
 
 void setup() {
   Serial.begin(9600);
-  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
   
   pinMode(StrobePin, OUTPUT);
   pinMode(ResetPin, OUTPUT);
   digitalWrite(StrobePin, HIGH);
   digitalWrite(ResetPin, LOW);
 
-  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(led3, OUTPUT);
 
 }
 
 void loop() {
   readData();
-
+  smoothData();
   for (int i=0; i<7; i++)
   {
     if (spectrum[i] < 100) Serial.print(" ");
@@ -37,21 +42,9 @@ void loop() {
   }
   Serial.println();
 
-  for (int n=0; n<7; n++) {
-
-  for(int i = 0; i < round(spectrum[n]/7.5); i++) {
-    // set our current dot to red, green, and blue
-    leds[i] = spectrum[n];
-    FastLED.show();
-  }
-  }
-
-  if (spectrum[0]> 175) {
-    digitalWrite(LED_BUILTIN, HIGH);
-  } else{
-    digitalWrite(LED_BUILTIN, LOW);
-  }
-  
+    analogWrite(led1, processData(spectrum[0]));
+    //analogWrite(led2, processData(spectrum[1]));
+    analogWrite(led3, processData(spectrum[2]));
 }
 
 
@@ -73,3 +66,23 @@ void readData() {
     delayMicroseconds(40);
   }
 }
+
+void smoothData(){
+  for (int i = 0 ; i <7; i++){
+     int total = 0;
+  for (int n = 0 ; n <=smoothing; n++){
+    total = total + spectrum[i];
+  }
+    smoothed[i] = total/smoothing;
+  }
+}
+
+
+int processData(int input) {
+  
+ int x = input - noisethresh;
+ input = max(x, 0);
+ //input = pow(1.2*input,1.3);
+ return input;
+}
+
